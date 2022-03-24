@@ -5,7 +5,8 @@ import torch.nn.functional as F
 from torch_geometric.nn.models import InnerProductDecoder, VGAE
 from torch_geometric.nn.conv import GCNConv
 from torch_geometric.utils import negative_sampling, remove_self_loops, add_self_loops
-
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import precision_recall_curve, auc
 
 class Encoder(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
@@ -31,24 +32,36 @@ class Graph_encoder(nn.Module):
     def forward(self, x, edge_index, value, index):
     
         index1 = index[:, 0]
-        index1 = index[:, 1]
+        index2 = index[:, 1]
         hidden1 = self.encoder(x, edge_index)
-        print(hidden1.shape, index1.shape)
         hidden1 = self.encoder(x, edge_index)[index1]
         hidden2 = self.encoder(x, edge_index)[index2]
-        #print(hidden1.shape, hidden2.shape, value1.shape, value2.shape, value_interact.shape)
         hidden = torch.cat((hidden1, hidden2, value), 1)
         output = self.decoder(hidden)
         output = torch.nn.ReLU()(output)
         pred = self.pred_layer(output)
         pred = torch.nn.Sigmoid()(pred)
-        return pred
+        
+        return torch.flatten(pred)
 
-    def single_test(self, x, train_pos_edge_index, test_pos_edge_index, test_neg_edge_index):
+    def dev_eval(self, x, edge_index, value, index, y):
         with torch.no_grad():
-            z = self.encode(x, train_pos_edge_index)
-        roc_auc_score, average_precision_score = self.test(z, test_pos_edge_index, test_neg_edge_index)
-        return roc_auc_score, average_precision_score
+            index1 = index[:, 0]
+            index2 = index[:, 1]
+            hidden1 = self.encoder(x, edge_index)
+            hidden1 = self.encoder(x, edge_index)[index1]
+            hidden2 = self.encoder(x, edge_index)[index2]
+            hidden = torch.cat((hidden1, hidden2, value), 1)
+            output = self.decoder(hidden)
+            output = torch.nn.ReLU()(output)
+            pred = self.pred_layer(output)
+            pred = torch.flatten(torch.nn.Sigmoid()(pred))
+        pred = pred.to('cpu').detach().numpy()
+        auc_roc = roc_auc_score(y, pred)
+        precision, recall, thresholds = precision_recall_curve(y, pred)
+        auc_precision_recall = auc(recall, precision)
+        
+        return pred, auc_roc, auc_precision_recall
 
 
 """

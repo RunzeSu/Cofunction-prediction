@@ -9,7 +9,6 @@ import torch_geometric.transforms as T
 from torch_geometric.utils import train_test_split_edges
 
 from autoencoder_model import Graph_encoder
-from config.config import parse_args
 from preprocess import preprocess
 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
@@ -45,7 +44,7 @@ parser.add_argument("--epoch",
                     type=int,
                     help="Number of epochs")
 parser.add_argument("--batch_size",
-                    default=8,
+                    default=64,
                     type=int,
                     help="Learning Rate")
 parser.add_argument("--lr",
@@ -59,8 +58,6 @@ args = parser.parse_args()
 model = Graph_encoder(args).to(device)
 optimizer = Adam(model.parameters(), lr=0.0001)
 graph_embedding, adj_matrix, edges, [training_value, dev_value, testing_value], [training_index, dev_index, testing_index], [training_y, dev_y, testing_y] = preprocess()
-graph_embedding, adj_matrix, edges, training_value, dev_value, testing_value, training_index, dev_index, testing_index, training_y, dev_y, testing_y = graph_embedding, adj_matrix, edges, training_value, dev_value, testing_value, training_index, dev_index, testing_index, training_y, dev_y, testing_y
-
 
 n_epochs = args.epoch # or whatever
 batch_size = args.batch_size # or whatever
@@ -70,26 +67,27 @@ for epoch in range(n_epochs):
     print("Epoch number ", epoch)
     model.train()
     optimizer.zero_grad()
-    loss = torch.nn.BCELoss()
+    loss_func = torch.nn.BCELoss()
     permutation = torch.randperm(length)
-    #graph_embedding = graph_embedding.repeat(batch_size, 1, 1)
-    #edges = edges.repeat(batch_size, 1, 1)
-    print("Training start")
     for i in range(0,length, batch_size):
-        
         indices = permutation[i:i+batch_size]
-        batch_value = training_value[indices]
-        batch_value.to(device)
-        batch_index = training_index[indices]
-        batch_index = batch_index.long().to(device)
-        batch_y = training_y[indices]
-        batch_y = batch_y.to(device)
-        pred = model(graph_embedding.to(device), edges.to(device), batch_value, batch_index)
-        loss = loss(pred,batch_y)
+        batch_value = training_value[indices].float().to(device)
+        batch_index = training_index[indices].long().to(device)
+        batch_y = training_y[indices].float().to(device)
+        pred = model(graph_embedding.float().to(device), edges.to(device), batch_value, batch_index)
+        loss = loss_func(pred,batch_y)
         loss.backward()
         optimizer.step()
-"""  
+    print("Training Loss = ", loss.to("cpu").detach().numpy())
     if epoch % 2 == 0:
         model.eval()
-        roc_auc, ap = model.single_test(graph_embedding, adj_matrix, testing_value)
-"""     
+        pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), edges.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
+        eval_loss = loss_func(torch.tensor(pred).to(device), dev_y.float().to(device))
+        eval_acc = torch.tensor(pred), dev_y.float()
+        
+        print("Validation Loss = ", eval_loss.to("cpu").detach().numpy())
+        print("Validation Accuracy = ", float(sum((pred >= 0.5) == (dev_y.int().numpy() == 1))/len(pred)))
+        print("ROC AUC in validation set = ", auc_roc)
+        print("PR AUC in validation set = ", auc_precision_recall)
+        
+        
