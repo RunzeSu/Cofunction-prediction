@@ -11,7 +11,7 @@ from torch_geometric.utils import train_test_split_edges
 from autoencoder_model import Graph_encoder
 from preprocess import preprocess
 
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 torch.manual_seed(12345)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -70,13 +70,11 @@ for epoch in range(n_epochs):
     loss_func = torch.nn.BCELoss()
     permutation = torch.randperm(length)
     for i in range(0,length, batch_size):
-        print (i)
         indices = permutation[i:i+batch_size]
         batch_edges = []
         batch_graph = []
         for k in indices:
             edges_copy = edges.copy()
-            
             if training_y[k] == 1:
                 i, j = training_index[k, 0], training_index[k, 1]
                 if (int(i), int(j)) in edges_copy:
@@ -88,14 +86,14 @@ for epoch in range(n_epochs):
         batch_value = training_value[indices].float().to(device)
         batch_index = training_index[indices].long().to(device)
         batch_y = training_y[indices].float().to(device)
-        pred = model(torch.tensor(batch_graph).to(device), torch.tensor(batch_edges).to(device), batch_value, batch_index)
+        pred = model(batch_graph.to(device), batch_edges.to(device), batch_value, batch_index)
         loss = loss_func(pred,batch_y)
         loss.backward()
         optimizer.step()
     print("Training Loss = ", loss.to("cpu").detach().numpy())
     if epoch % 2 == 0:
         model.eval()
-        pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), torch.tensor(batch_edges).T.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
+        pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), torch.tensor(list(edges)).T.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
         eval_loss = loss_func(torch.tensor(pred).to(device), dev_y.float().to(device))
         eval_acc = torch.tensor(pred), dev_y.float()
         
