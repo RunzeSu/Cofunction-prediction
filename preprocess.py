@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 def preprocess():
-
+          
     unique_genes = []
     with open('/mnt/ufs18/home-052/surunze/gene_interaction/Pathways-of-gene-All--in-Saccharomyces-cerevisiae-S288c_metacyc.txt') as f:
         record = f.readlines()
@@ -11,7 +11,7 @@ def preprocess():
     genes = []
     for i, item in enumerate(record):
         ls = item.split("\t")[1].split(" // ")
-        ls[-1] = ls[-1][:-2]
+        ls[-1] = ls[-1][:-1]
         if len(ls) > 1:
             genes.append(ls)
             unique_genes += ls
@@ -34,9 +34,6 @@ def preprocess():
                 if adj_matrix[index_1][index_2] == 0:
                     adj_matrix[index_1][index_2] = 1
                     adj_matrix[index_2][index_1] = 1
-        
-    
-    
     y = ft_data[:, 1]
     node_embeddings = np.identity(len(unique_genes))
     node_value = np.zeros((len(ft_data), 3))
@@ -49,7 +46,7 @@ def preprocess():
                 gene_index_2 = unique_genes[connection[j]]
                 edges.append([gene_index_1, gene_index_2])
     
-    edges = np.unique(np.array(edges), axis = 0)
+    edges = set(map(tuple, np.unique(np.array(edges), axis = 0)))
     index = np.zeros([len(ft_data), 2])
     for i, name in enumerate(ft_data[:, 0]):
         gene_1, gene_2 = name.split("_")
@@ -58,7 +55,7 @@ def preprocess():
         node_value[i, 0] = ft_data[i, 2]
         node_value[i, 1] = ft_data[i, 3]
         node_value[i, 2] = ft_data[i, 4]
-        
+    
     training_sample = 140080
     testing_sample = 150220
     training_value = node_value[0:training_sample]
@@ -71,7 +68,21 @@ def preprocess():
     dev_y = y[training_sample:testing_sample]
     testing_y = y[testing_sample:]
     
-    return torch.tensor(node_embeddings), torch.tensor(adj_matrix),  torch.tensor(edges).T, [torch.tensor(training_value), torch.tensor(dev_value), torch.tensor(testing_value)], [torch.tensor(training_index), torch.tensor(dev_index), torch.tensor(testing_index)], [torch.tensor(training_y.astype(float)), torch.tensor(dev_y.astype(float)), torch.tensor(testing_y.astype(float))]
+    for k, [i, j] in enumerate(dev_index):
+        if dev_y[k] == 1:
+            if (int(i), int(j)) in edges:
+                edges.remove((int(i), int(j)))
+            if (int(j), int(i)) in edges:
+                edges.remove((int(j), int(i)))
+    
+    for k, [i, j] in enumerate(testing_index):
+        if testing_y[k] == 1:
+            if (int(i), int(j)) in edges:
+                edges.remove((int(i), int(j)))
+            if (int(j), int(i)) in edges:
+                edges.remove((int(j), int(i)))
+        
+    return torch.tensor(node_embeddings), torch.tensor(adj_matrix),  edges, [torch.tensor(training_value), torch.tensor(dev_value), torch.tensor(testing_value)], [torch.tensor(training_index), torch.tensor(dev_index), torch.tensor(testing_index)], [torch.tensor(training_y.astype(float)), torch.tensor(dev_y.astype(float)), torch.tensor(testing_y.astype(float))]
 
 
 

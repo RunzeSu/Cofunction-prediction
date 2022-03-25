@@ -24,7 +24,7 @@ parser.add_argument("--dataset",
                     type=str,
                     help="The input data dir.")
 parser.add_argument("--enc_in_channels",
-                    default=1109,
+                    default=972,
                     type=int,
                     help="The input dimension")
 parser.add_argument("--enc_hidden_channels",
@@ -44,7 +44,7 @@ parser.add_argument("--epoch",
                     type=int,
                     help="Number of epochs")
 parser.add_argument("--batch_size",
-                    default=64,
+                    default=1,
                     type=int,
                     help="Learning Rate")
 parser.add_argument("--lr",
@@ -70,18 +70,32 @@ for epoch in range(n_epochs):
     loss_func = torch.nn.BCELoss()
     permutation = torch.randperm(length)
     for i in range(0,length, batch_size):
+        print (i)
         indices = permutation[i:i+batch_size]
+        batch_edges = []
+        batch_graph = []
+        for k in indices:
+            edges_copy = edges.copy()
+            
+            if training_y[k] == 1:
+                i, j = training_index[k, 0], training_index[k, 1]
+                if (int(i), int(j)) in edges_copy:
+                    edges_copy.remove((int(i), int(j)))
+                if (int(j), int(i)) in edges_copy:
+                    edges_copy.remove((int(j), int(i)))
+            batch_edges = torch.tensor(list(edges_copy)).T
+            batch_graph = graph_embedding.float()
         batch_value = training_value[indices].float().to(device)
         batch_index = training_index[indices].long().to(device)
         batch_y = training_y[indices].float().to(device)
-        pred = model(graph_embedding.float().to(device), edges.to(device), batch_value, batch_index)
+        pred = model(torch.tensor(batch_graph).to(device), torch.tensor(batch_edges).to(device), batch_value, batch_index)
         loss = loss_func(pred,batch_y)
         loss.backward()
         optimizer.step()
     print("Training Loss = ", loss.to("cpu").detach().numpy())
     if epoch % 2 == 0:
         model.eval()
-        pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), edges.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
+        pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), torch.tensor(batch_edges).T.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
         eval_loss = loss_func(torch.tensor(pred).to(device), dev_y.float().to(device))
         eval_acc = torch.tensor(pred), dev_y.float()
         
