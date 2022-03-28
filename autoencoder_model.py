@@ -30,19 +30,22 @@ class Graph_encoder(nn.Module):
         
 
     def forward(self, x, edge_index, value, index):
-    
-        index1 = index[:, 0]
-        index2 = index[:, 1]
-        hidden1 = self.encoder(x, edge_index)
-        hidden1 = self.encoder(x, edge_index)[index1]
-        hidden2 = self.encoder(x, edge_index)[index2]
-        hidden = torch.cat((hidden1, hidden2, value), 1)
-        output = self.decoder(hidden)
-        output = torch.nn.ReLU()(output)
-        pred = self.pred_layer(output)
-        pred = torch.nn.Sigmoid()(pred)
         
-        return torch.flatten(pred)
+        all_pred = []
+        for k in range(len(edge_index)):
+        
+            index1 = index[k:k+1, 0]
+            index2 = index[k:k+1, 1]
+            hidden1 = self.encoder(x, edge_index[k])[index1]
+            hidden2 = self.encoder(x, edge_index[k])[index2]
+            hidden = torch.cat((hidden1, hidden2, value[k:k+1]), 1)
+            output = self.decoder(hidden)
+            output = torch.nn.ReLU()(output)
+            pred = self.pred_layer(output)
+            pred = torch.nn.Sigmoid()(pred)
+            all_pred.append(torch.flatten(pred))
+        
+        return torch.cat(all_pred)
 
     def dev_eval(self, x, edge_index, value, index, y):
         with torch.no_grad():
