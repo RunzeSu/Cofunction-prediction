@@ -39,7 +39,7 @@ parser.add_argument("--hidden_dimension",
                     type=int,
                     help="The hidden dimension of the decoder")
 parser.add_argument("--epoch",
-                    default=400,
+                    default=30,
                     type=int,
                     help="Number of epochs")
 parser.add_argument("--batch_size",
@@ -50,6 +50,10 @@ parser.add_argument("--lr",
                     default=0.0001,
                     type=float,
                     help="Learning Rate")
+parser.add_argument("--model_path",
+                    default="/mnt/ufs18/home-052/surunze/gene_interaction/VGAE_pyG/saved_models",
+                    type=str,
+                    help="Path for trained model")
 
 args = parser.parse_args()
 
@@ -84,7 +88,7 @@ for k in range(len(training_value)):
     training_data = Data(batch_edges = batch_edges, batch_graph = batch_graph, batch_value = batch_value, batch_index = batch_index, batch_y = batch_y)
     training_loader = DataLoader(training_data, batch_size=batch_size, shuffle=True)
 """
-
+epoch = 0
 for epoch in range(n_epochs):
     print("Epoch number ", epoch)
     model.train()
@@ -107,9 +111,8 @@ for epoch in range(n_epochs):
                     edges_copy.add((1, 1))
             edges_copy = map(list, edges_copy)
             batch_edges.append(torch.tensor(list(edges_copy)).T)
-        
+            
         batch_edges = torch.stack(batch_edges, dim=0)
-        #batch_edges = torch.tensor(list(edges_copy)).T
         batch_graph = graph_embedding.float()
         batch_value = training_value[indices].float().to(device)
         batch_index = training_index[indices].long().to(device)
@@ -118,24 +121,10 @@ for epoch in range(n_epochs):
         loss = loss_func(pred,batch_y)
         loss.backward()
         optimizer.step()
-        """
-        if l % 2000 == 0:
-            model.eval()
-            pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), torch.tensor(list(edges)).T.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
-            eval_loss = loss_func(torch.tensor(pred).to(device), dev_y.float().to(device))
-            eval_acc = torch.tensor(pred), dev_y.float()
-            
-            print("Validation Loss = ", eval_loss.to("cpu").detach().numpy())
-            print("Validation Accuracy = ", float(sum((pred >= 0.5) == (dev_y.int().numpy() == 1))/len(pred)))
-            print("ROC AUC in validation set = ", auc_roc)
-            print("PR AUC in validation set = ", auc_precision_recall)
-        """
-    
-    
     print("Training Loss = ", loss.to("cpu").detach().numpy())
     if epoch % 1 == 0:
         model.eval()
-        pred, auc_roc, auc_precision_recall = model.dev_eval(graph_embedding.float().to(device), torch.tensor(list(edges)).T.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
+        pred, auc_roc, auc_precision_recall = model.run_eval(graph_embedding.float().to(device), torch.tensor(list(edges)).T.to(device), dev_value.float().to(device), dev_index.long().to(device), dev_y.float().to('cpu').numpy())  
         eval_loss = loss_func(torch.tensor(pred).to(device), dev_y.float().to(device))
         eval_acc = torch.tensor(pred), dev_y.float()
         
@@ -144,5 +133,4 @@ for epoch in range(n_epochs):
         print("Validation Accuracy = ", float(sum((pred >= 0.5) == (dev_y.int().numpy() == 1))/len(pred)))
         print("ROC AUC in validation set = ", auc_roc)
         print("PR AUC in validation set = ", auc_precision_recall)
-
-    
+        torch.save(model.state_dict(), args.model_path+"/model_epoch_"+str(epoch))

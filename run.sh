@@ -1,7 +1,7 @@
 #!/bin/bash --login
 
 #SBATCH --qos=normal
-#SBATCH --time=50:00:00
+#SBATCH --time=100:00:00
 #SBATCH --mem=30G  
 #SBATCH --gres=gpu:v100:1
 #SBATCH --output=slurm-%A_%a.out

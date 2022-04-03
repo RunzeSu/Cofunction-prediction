@@ -47,7 +47,7 @@ class Graph_encoder(nn.Module):
         
         return torch.cat(all_pred)
 
-    def dev_eval(self, x, edge_index, value, index, y):
+    def run_eval(self, x, edge_index, value, index, y):
         with torch.no_grad():
             index1 = index[:, 0]
             index2 = index[:, 1]

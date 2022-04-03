@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 
 def preprocess():
-          
+              
     unique_genes = []
     with open('/mnt/ufs18/home-052/surunze/gene_interaction/Pathways-of-gene-All--in-Saccharomyces-cerevisiae-S288c_metacyc.txt') as f:
         record = f.readlines()
@@ -21,6 +21,7 @@ def preprocess():
         unique_genes += item[0].split("_")
     
     unique_genes = list(set(unique_genes))
+    unique_genes.sort()
     unique_genes = {unique_genes[i]: i for i in range(len(unique_genes))}
     adj_matrix = np.zeros((len(unique_genes), len(unique_genes)))
     
@@ -34,10 +35,11 @@ def preprocess():
                 if adj_matrix[index_1][index_2] == 0:
                     adj_matrix[index_1][index_2] = 1
                     adj_matrix[index_2][index_1] = 1
+    
     y = ft_data[:, 1]
     node_embeddings = np.identity(len(unique_genes))
     node_value = np.zeros((len(ft_data), 3))
-    
+        
     edges = []
     for connection in genes:
         for i in range(0, len(connection) - 1):
@@ -47,6 +49,7 @@ def preprocess():
                 edges.append([gene_index_1, gene_index_2])
     
     edges = set(map(tuple, np.unique(np.array(edges), axis = 0)))
+
     index = np.zeros([len(ft_data), 2])
     for i, name in enumerate(ft_data[:, 0]):
         gene_1, gene_2 = name.split("_")
